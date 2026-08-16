@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="WaveLens — Local-first, offline, zero-dependency browser audio spectrogram & sound analysis lab. 零依赖、离线、本地优先的浏览器音频频谱分析实验室。">
+<meta name="color-scheme" content="dark">
+<title>WaveLens · 音频频谱分析实验室</title>
+<style>
+  :root{
+    --bg:#0a0d12;
+    --bg-1:#0f141b;
+    --bg-2:#151b24;
+    --panel:#11161f;
+    --line:#1f2733;
+    --line-2:#2a3442;
+    --text:#e6edf6;
+    --text-dim:#8b98a9;
+    --text-faint:#5b6675;
+    --accent:#5eead4;
+    --accent-2:#38bdf8;
+    --accent-3:#a78bfa;
+    --danger:#fb7185;
+    --ok:#34d399;
+    --warn:#fbbf24;
+    --radius:14px;
+    --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(56,189,248,.08), transparent 60%),
+      radial-gradient(1000px 500px at 0% 110%, rgba(167,139,250,.07), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  ::selection{background:rgba(94,234,212,.25)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:#37424f}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  .app{display:flex;flex-direction:column;height:100vh;height:100svh}
+
+  header{
+    display:flex;align-items:center;gap:18px;
+    padding:12px 20px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,18,.72);backdrop-filter:blur(14px);position:relative;z-index:5;
+  }
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .brand-mark{
+    width:34px;height:34px;border-radius:10px;flex:none;
+    background:conic-gradient(from 210deg,var(--accent),var(--accent-2) 40%,var(--accent-3) 75%);
+    display:grid;place-items:center;color:#06121a;box-shadow:0 4px 18px rgba(56,189,248,.35);
+  }
+  .brand-mark svg{width:20px;height:20px}
+  .brand h1{font-size:17px;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  .brand h1 b{background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand small{display:block;font-size:11px;color:var(--text-faint);font-weight:500;margin-top:1px;white-space:nowrap}
+
+  .head-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .status-pill{
+    display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-dim);
+    background:var(--bg-2);white-space:nowrap;
+  }
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint)}
+  .status-pill.on{color:var(--accent);border-color:rgba(94,234,212,.35)}
+  .status-pill.on .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .status-pill.rec .dot{background:var(--danger);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .btn{
+    appearance:none;border:1px solid var(--line-2);background:var(--bg-2);color:var(--text);
+    font-family:var(--sans);font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;
+    cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.16s ease;
+  }
+  .btn:hover{border-color:#3a4655;background:#1a222d;transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#07121a;border:none;box-shadow:0 4px 16px rgba(56,189,248,.28);font-weight:700}
+  .btn.primary:hover{filter:brightness(1.06);border:none}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--bg-1)}
+  .tool-group{display:flex;align-items:center;gap:8px}
+  .tool-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:600}
+  select{
+    appearance:none;background:var(--bg-2);border:1px solid var(--line-2);color:var(--text);
+    font-family:var(--sans);font-size:12.5px;font-weight:500;border-radius:8px;padding:6px 30px 6px 10px;cursor:pointer;outline:none;transition:.15s;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' stroke='%238b98a9' fill='none' stroke-width='1.5' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;
+  }
+  select:hover{border-color:#3a4655}
+  select:focus{border-color:var(--accent)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:110px;height:4px;border-radius:4px;background:var(--line-2);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(94,234,212,.5)}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;background:var(--accent);cursor:pointer}
+  .seg{display:inline-flex;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
+  .seg button{border:none;background:transparent;color:var(--text-dim);font-family:var(--sans);font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;transition:.15s;border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:none}
+  .seg button:hover{color:var(--text)}
+  .seg button.active{background:rgba(94,234,212,.14);color:var(--accent)}
+
+  main{flex:1;display:flex;flex-direction:column;gap:14px;padding:16px 20px;overflow:hidden;min-height:0}
+  .viz-box{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .viz-box .cap{
+    position:absolute;top:10px;left:10px;z-index:3;display:inline-flex;align-items:center;gap:7px;
+    font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);
+    background:rgba(10,13,18,.6);padding:4px 9px;border-radius:7px;border:1px solid var(--line);backdrop-filter:blur(6px);
+  }
+  .viz-box .cap .kv{color:var(--accent);font-family:var(--mono)}
+  canvas{display:block;width:100%;height:100%}
+
+  #spec-box{flex:1.4;min-height:0}
+  #wave-box{flex:0 0 92px;min-height:60px}
+  .plots{flex:1;display:flex;gap:14px;min-height:0}
+  .plots .viz-box{flex:1}
+
+  .overlay{
+    position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    background:linear-gradient(180deg,rgba(10,13,18,.5),rgba(10,13,18,.86));text-align:center;padding:20px;transition:opacity .3s;cursor:pointer;
+  }
+  .overlay.hide{opacity:0;pointer-events:none}
+  .overlay .big{font-size:15px;color:var(--text-dim);font-weight:500;max-width:430px;line-height:1.6}
+  .overlay .big b{color:var(--accent);font-weight:700}
+  .overlay .drop{border:1.5px dashed var(--line-2);border-radius:16px;padding:32px 46px;color:var(--text-dim);transition:.2s}
+  .overlay:hover .drop{border-color:var(--accent);color:var(--text);background:rgba(94,234,212,.04)}
+  .overlay .drop .ico{font-size:34px;margin-bottom:10px}
+  .overlay .hint{font-size:12px;color:var(--text-faint)}
+  .overlay .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+  .meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:14px;align-content:center}
+  .meter{background:rgba(15,20,27,.6);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:72px}
+  .meter .lbl{display:flex;justify-content:space-between;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);font-weight:600}
+  .meter .val{font-family:var(--mono);font-size:18px;font-weight:700;margin-top:5px;letter-spacing:.3px}
+  .meter .val small{font-size:11px;color:var(--text-faint);font-weight:500;margin-left:2px}
+  .meter .bar{height:4px;border-radius:4px;background:var(--line);margin-top:10px;overflow:hidden}
+  .meter .bar i{display:block;height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .08s linear}
+  .meter.g .val{color:var(--accent)}
+  .meter.b .val{color:var(--accent-2)}
+  .meter.p .val{color:var(--accent-3)}
+  .meter.o .val{color:var(--warn)}
+  .meter.r .val{color:var(--danger)}
+
+  footer{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 20px;border-top:1px solid var(--line);
+    background:var(--bg-1);font-size:11.5px;color:var(--text-faint);
+  }
+  footer .privacy{display:inline-flex;align-items:center;gap:6px;color:var(--ok);font-weight:600}
+  footer .meta{margin-left:auto;font-family:var(--mono)}
+
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:var(--bg-2);border:1px solid var(--line-2);color:var(--text);
+    padding:11px 18px;border-radius:12px;font-size:13px;font-weight:500;z-index:50;
+    opacity:0;pointer-events:none;transition:.3s;box-shadow:0 12px 40px rgba(0,0,0,.5);
+    display:flex;align-items:center;gap:9px;max-width:82vw;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.error{border-color:rgba(251,113,133,.5)}
+  #toast .t-ico{color:var(--accent)}
+  #toast.error .t-ico{color:var(--danger)}
+
+  .loading-bar{position:absolute;left:0;right:0;top:0;height:3px;background:transparent;z-index:6;overflow:hidden}
+  .loading-bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent-3));transition:width .2s}
+
+  @media (max-width:860px){
+    .plots{flex-direction:column}
+    header{flex-wrap:wrap}
+    .brand small{display:none}
+    .toolbar{gap:8px}
+    main{padding:12px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 14 3-10 2 3h6"/></svg>
+      </div>
+      <div>
+        <h1>Wave<b>Lens</b></h1>
+        <small>音频频谱分析实验室 · Audio Spectrogram Lab</small>
+      </div>
+    </div>
+    <div class="head-actions">
+      <span id="statusPill" class="status-pill"><span class="dot"></span><span id="statusText">闲置 Idle</span></span>
+      <button class="btn" id="btnMic" title="使用麦克风实时分析">🎤 麦克风</button>
+      <button class="btn primary" id="btnFile">⬆ 载入音频</button>
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm" hidden>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="tool-group"><span class="tool-label">FFT</span>
+      <select id="selFft">
+        <option value="512">512</option>
+        <option value="1024">1024</option>
+        <option value="2048" selected>2048</option>
+        <option value="4096">4096</option>
+        <option value="8192">8192</option>
+      </select>
+    </div>
+    <div class="tool-group"><span class="tool-label">窗函数</span>
+      <select id="selWindow">
+        <option value="hann" selected>Hann</option>
+        <option value="hamming">Hamming</option>
+        <option value="blackman">Blackman</option>
+        <option value="blackmanharris">Blackman-Harris</option>
+        <option value="welch">Welch</option>
+        <option value="rect">Rectangular</option>
+      </select>
+    </div>
+    <div class="tool-group"><span class="tool-label">色图</span>
+      <select id="selColor">
+        <option value="magma" selected>Magma</option>
+        <option value="viridis">Viridis</option>
+        <option value="inferno">Inferno</option>
+        <option value="plasma">Plasma</option>
+        <option value="turbo">Turbo</option>
+        <option value="ocean">Ocean</option>
+        <option value="grayscale">Grayscale</option>
+      </select>
+    </div>
+    <div class="tool-group"><span class="tool-label">平滑</span><input type="range" id="rngSmooth" min="0" max="95" value="65"></div>
+    <div class="tool-group"><span class="tool-label">增益dB</span><input type="range" id="rngGain" min="-60" max="12" value="0"></div>
+    <div class="tool-group"><div class="seg" id="segMode">
+      <button data-mode="real" class="active">实时</button>
+      <button data-mode="full">全文件</button>
+    </div></div>
+    <div class="tool-group" style="margin-left:auto">
+      <button class="btn" id="btnPlay" disabled>▶ 播放</button>
+      <button class="btn" id="btnPause" disabled>⏸ 暂停</button>
+      <button class="btn" id="btnExport" disabled>⬇ 导出 PNG</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="viz-box" id="spec-box">
+      <span class="loading-bar" id="loadBar"><i></i></span>
+      <div class="cap">频谱图 Spectrogram <span class="kv" id="specCap">—</span></div>
+      <canvas id="specCanvas"></canvas>
+      <div class="overlay" id="overlay">
+        <div style="text-align:center">
+          <div class="drop">
+            <div class="ico">🎧</div>
+            <div>拖放音频文件到此处，或点击 <b>载入音频</b></div>
+            <div style="margin-top:6px;font-size:12.5px;color:var(--text-faint)">支持 WAV · MP3 · FLAC · OGG · M4A · AAC</div>
+          </div>
+          <div class="hint" style="margin-top:14px">所有处理均在本地完成，音频永不离开你的设备</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="viz-box" id="wave-box">
+      <div class="cap">波形 Waveform <span class="kv" id="waveCap">—</span></div>
+      <canvas id="waveCanvas"></canvas>
+    </div>
+
+    <div class="plots">
+      <div class="viz-box" id="freq-box">
+        <div class="cap">频谱 Frequency <span class="kv" id="freqCap">—</span></div>
+        <canvas id="freqCanvas"></canvas>
+      </div>
+      <div class="viz-box" id="stat-box">
+        <div class="cap">统计学 Statistics <span class="kv" id="statCap">RMS / Peak / LUFS</span></div>
+        <div class="meters" id="meters">
+          <div class="meter g"><div class="lbl"><span>RMS 均方根</span><span>dBFS</span></div><div class="val" id="mRms">−∞</div><div class="bar"><i id="bRms"></i></div></div>
+          <div class="meter r"><div class="lbl"><span>Peak 峰值</span><span>dBFS</span></div><div class="val" id="mPeak">−∞</div><div class="bar"><i id="bPeak"></i></div></div>
+          <div class="meter p"><div class="lbl"><span>Crest 峰值因数</span><span>dB</span></div><div class="val" id="mCrest">—</div><div class="bar"><i id="bCrest"></i></div></div>
+          <div class="meter o"><div class="lbl"><span>Loudness 响度</span><span>LUFS</span></div><div class="val" id="mLufs">−∞</div><div class="bar"><i id="bLufs"></i></div></div>
+          <div class="meter b"><div class="lbl"><span>Centroid 频谱质心</span><span>Hz</span></div><div class="val" id="mCent">—</div><div class="bar"><i id="bCent"></i></div></div>
+          <div class="meter g"><div class="lbl"><span>ZCR 过零率</span><span>%</span></div><div class="val" id="mZcr">—</div><div class="bar"><i id="bZcr"></i></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span class="privacy">🔒 本地处理 · 数据不出设备</span>
+    <span>WaveLens v1.0.0 · 零依赖 · 可离线 · MIT 开源</span>
+    <span class="meta" id="metaInfo">—</span>
+  </footer>
+</div>
+
+<div id="toast"><span class="t-ico">✓</span><span id="toastMsg"></span></div>
+
+<script>
+"use strict";
+/* ============================================================
+   WaveLens · Audio Spectrogram & Sound Analysis Lab
+   Zero-dependency · Offline · Local-first · 100% in-browser
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const F32 = typeof Float32Array!=="undefined" ? Float32Array : Array;
+
+/* ---------------- FFT (iterative radix-2, in-place) ---------------- */
+function createFFT(n){
+  const bits = Math.round(Math.log2(n));
+  const rev = new Int32Array(n);
+  for(let i=1;i<n;i++) rev[i] = (rev[i>>1]>>1) | ((i&1) << (bits-1));
+  const cos = new F32(n>>1), sin = new F32(n>>1);
+  for(let i=0;i<(n>>1);i++){ cos[i]=Math.cos(2*Math.PI*i/n); sin[i]=Math.sin(2*Math.PI*i/n); }
+  // returns {re, im} magnitude-based arrays are drawn from re/im
+  return function fft(re, im){
+    // bit-reversal permutation in-place
+    for(let i=1;i<n;i++){
+      const j=rev[i];
+      if(i<j){
+        let t;
+        t=re[i]; re[i]=re[j]; re[j]=t;
+        t=im[i]; im[i]=im[j]; im[j]=t;
+      }
+    }
+    for(let size=2;size<=n;size<<=1){
+      const half=size>>1, step=n/size;
+      for(let i=0;i<n;i+=size){
+        for(let j=0;j<half;j++){
+          const k=j*step;
+          const c=cos[k], s=sin[k];
+          const a=i+j, b=i+j+half;
+          const tr = re[b]*c + im[b]*s;
+          const ti = im[b]*c - re[b]*s;
+          re[b]=re[a]-tr; im[b]=im[a]-ti;
+          re[a]=re[a]+tr; im[a]=im[a]+ti;
+        }
+      }
+    }
+    return {re, im};
+  };
+}
+
+/* ---------------- Window functions ---------------- */
+function makeWindow(name, n){
+  const w = new F32(n);
+  for(let i=0;i<n;i++){
+    const x=i/(n-1);
+    switch(name){
+      case 'hann':      w[i]=0.5-0.5*Math.cos(2*Math.PI*i/(n-1)); break;
+      case 'hamming':   w[i]=0.54-0.46*Math.cos(2*Math.PI*i/(n-1)); break;
+      case 'blackman':  w[i]=0.42-0.5*Math.cos(2*Math.PI*i/(n-1))+0.08*Math.cos(4*Math.PI*i/(n-1)); break;
+      case 'blackmanharris': w[i]=0.35875-0.48829*Math.cos(2*Math.PI*i/(n-1))+0.14128*Math.cos(4*Math.PI*i/(n-1))-0.01168*Math.cos(6*Math.PI*i/(n-1)); break;
+      case 'welch':     w[i]=1-Math.pow(2*x-1,2); break;
+      case 'rect':      w[i]=1; break;
+      default:          w[i]=1; break;
+    }
+  }
+  return w;
+}
+
+/* ---------------- Color maps ---------------- */
+const CMAPS = {
+  magma:    [[0,0,4],[82,4,42],[159,38,92],[226,86,71],[253,151,31],[252,255,148]],
+  viridis:  [[68,1,84],[59,85,139],[33,145,140],[94,201,98],[253,231,37]],
+  inferno:  [[0,0,4],[87,16,110],[180,54,118],[249,120,62],[252,255,164]],
+  plasma:   [[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]],
+  turbo:    [[48,18,59],[47,101,225],[15,179,255],[80,227,194],[202,244,112],[255,231,0]],
+  ocean:    [[8,28,64],[24,88,156],[64,164,212],[120,224,240],[196,240,246],[248,252,255]],
+  grayscale:[[0,0,0],[255,255,255]]
+};
+function buildLUT(name, size){
+  const stops=CMAPS[name]||CMAPS.magma;
+  const lut=new Uint8ClampedArray(size*3);
+  for(let i=0;i<size;i++){
+    const t=i/(size-1) * (stops.length-1);
+    const idx=Math.floor(t), f=t-idx;
+    const a=stops[idx], b=stops[Math.min(idx+1,stops.length-1)];
+    lut[i*3]=Math.round(a[0]+(b[0]-a[0])*f);
+    lut[i*3+1]=Math.round(a[1]+(b[1]-a[1])*f);
+    lut[i*3+2]=Math.round(a[2]+(b[2]-a[2])*f);
+  }
+  return lut;
+}
+
+/* ---------------- Canvas & view model ---------------- */
+const specCv=$('specCanvas'), specCtx=specCv.getContext('2d');
+const waveCv=$('waveCanvas'), waveCtx=waveCv.getContext('2d');
+const freqCv=$('freqCanvas'), freqCtx=freqCv.getContext('2d');
+
+let DPR=Math.min(window.devicePixelRatio||1,2);
+function sizeCanvas(cv, box){
+  const w=box.clientWidth, h=box.clientHeight;
+  cv.width=w*DPR; cv.height=h*DPR;
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  return {w:h|0?cv.width:0, h:cv.height, cssW:w, cssH:h};
+}
+function resizeAll(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  const s=sizeCanvas(specCv,$('spec-box'));
+  sizeCanvas(waveCv,$('wave-box'));
+  sizeCanvas(freqCv,$('freq-box'));
+  initSpectrogramBuffer(s.w, s.h);
+  if(fullMode) drawFullSpectrogram();
+}
+window.addEventListener('resize', resizeAll);
+
+/* ---------------- Spectrogram history buffer ---------------- */
+let spec = { width:0, height:0, cols:null, x:0, bins:0, ready:false };
+function initSpectrogramBuffer(w,h){
+  if(!w||!h) return;
+  spec.width=w; spec.height=h;
+  spec.bins=h;
+  spec.cols=new Array(w);
+  for(let i=0;i<w;i++) spec.cols[i]=new F32(h);
+  spec.x=0; spec.ready=true;
+}
+
+/* ---------------- Audio engine state ---------------- */
+const eng = {
+  ctx:null, analyser:null, source:null, bufferNode:null, mediaStream:null,
+  buffer:null,          // decoded AudioBuffer
+  playing:false, micOn:false,
+  fftSize:2048, window:null, windowName:'hann',
+  timeData:null, freqData:null, re:null, im:null, fft:null,
+  gain:0, smoothing:.65,
+  startTime:0, offset:0, duration:0, fileName:'',
+  meta:{ rms:-Infinity, peak:-Infinity, crest:0, lufs:-Infinity, centroid:0, zcr:0 },
+  sos:null
+};
+let fullMode=false;
+let fftFn=null;
+
+function ensureCtx(){
+  if(!eng.ctx){
+    const AC = window.AudioContext||window.webkitAudioContext;
+    eng.ctx=new AC();
+  }
+  if(eng.ctx.state==='suspended') eng.ctx.resume();
+}
+
+function rebuildFFT(){
+  if(!eng.ctx) return;
+  eng.fftSize=parseInt($('selFft').value,10);
+  eng.windowName=$('selWindow').value;
+  eng.window=makeWindow(eng.windowName, eng.fftSize);
+  fftFn=createFFT(eng.fftSize);
+  if(eng.analyser){ eng.analyser.fftSize=eng.fftSize; eng.analyser.smoothingTimeConstant=0.75; }
+  eng.timeData=new F32(eng.fftSize);
+  eng.freqData=new Uint8Array(eng.analyser?eng.analyser.frequencyBinCount:eng.fftSize/2);
+  eng.re=new F32(eng.fftSize); eng.im=new F32(eng.fftSize);
+}
+
+/* ---------------- Analytics ---------------- */
+const LUFS_WEIGHTS = makeWeights();
+function makeWeights(){
+  // A simple K-weighting approximation for integrated loudness estimate
+  const ws=new F32(2048);
+  return ws;
+}
+function computeMetrics(){
+  const td=eng.timeData, n=td.length;
+  let sum=0, peak=0, zcr=0;
+  for(let i=0;i<n;i++){
+    const s=td[i]; sum+=s*s; if(Math.abs(s)>peak)peak=Math.abs(s);
+    if(i>0 && ((td[i-1]>0&&td[i]<0)||(td[i-1]<0&&td[i]>0))) zcr++;
+  }
+  const rms=Math.sqrt(sum/n);
+  const rmsDB=rms>1e-9?20*Math.log10(rms):-Infinity;
+  const peakDB=peak>1e-9?20*Math.log10(peak):-Infinity;
+  const crestDB=(rms>1e-9&&peak>1e-9)?20*Math.log10(peak/rms):0;
+  // approximate integrated loudness (LUFS) using frequency weighting on spectrum
+  const mags=eng.re, bins=n>>1;
+  let sumW=0, sumWM=0;
+  for(let b=1;b<bins;b++){
+    const m=Math.hypot(eng.re[b],eng.im[b]);
+    const f=b*eng.ctx.sampleRate/n;
+    // approximate K-weighting curve
+    const z0=Math.max(0,Math.min(1, (f-2000)/9500));
+    const w=0.4+1.2*z0;
+    sumW+=w; sumWM+=m*w;
+  }
+  const lufs = sumW>0 ? (20*Math.log10((sumWM/sumW)+1e-9)+ (sumW>0?0:0)) : -Infinity;
+  // spectral centroid
+  let centNum=0, centDen=0;
+  for(let b=1;b<bins;b++){
+    const m=Math.hypot(eng.re[b],eng.im[b]);
+    const f=b*eng.ctx.sampleRate/n;
+    centNum+=f*m; centDen+=m;
+  }
+  const centroid=centDen>0?centNum/centDen:0;
+  eng.meta={ rms:rmsDB, peak:peakDB, crest:crestDB, lufs, centroid, zcr:zcr/n*100 };
+}
+
+function renderMeters(){
+  const m=eng.meta;
+  setMeter('mRms','bRms',m.rms,0.9);
+  setMeter('mPeak','bPeak',m.peak,0.9);
+  setMeter('mCrest','bCrest',isFinite(m.crest)?m.crest:-Infinity,0.5);
+  setMeter('mLufs','bLufs',m.lufs,0.5);
+  const cent=clamp(m.centroid/ (eng.ctx?eng.ctx.sampleRate/2:20000) ,0,1);
+  $('mCent').textContent = m.centroid? (m.centroid>=1000? (m.centroid/1000).toFixed(1)+'kHz' : Math.round(m.centroid)+'Hz') : '—';
+  $('bCent').style.width = (m.centroid?cent*100:0)+'%';
+  setMeter('mZcr','bZcr',m.zcr, 0.5);
+}
+function setMeter(vId,bId,val,max){
+  const vEl=$(vId), bEl=$(bId);
+  if(!isFinite(val)){ vEl.textContent='−∞'; bEl.style.width='0%'; return; }
+  const db=clamp(val,-60,0);
+  const pct=clamp((db+60)/60,0,1)*100;
+  vEl.textContent=val.toFixed(1);
+  bEl.style.width=pct+'%';
+}
+
+/* ---------------- Spectrogram column push ---------------- */
+function pushSpectrogramColumn(){
+  if(!spec.ready) return;
+  const bins=eng.fftSize>>1;
+  const im=specCols(spec.x);
+  const g=eng.gain;
+  const minDb=-90; // dB floor
+  for(let y=0;y<spec.height;y++){
+    // map canvas y (top=high freq) to bin
+    const bin=Math.round((1 - y/(spec.height-1)) * (bins-1));
+    const m=Math.hypot(eng.re[bin],eng.im[bin]);
+    const db=20*Math.log10(m+1e-12)+g;
+    const norm=clamp((db-minDb)/(-minDb),0,1);
+    im[y]=norm;
+  }
+  spec.x=(spec.x+1)%spec.width;
+}
+function specCols(x){ return spec.cols[x]; }
+
+let lastDraw=0;
+function drawSpectrogramColumn(){
+  if(!spec.ready || !isFinite(lastDraw)) lastDraw=performance.now();
+  const sm=eng.smoothing;
+  const img=specCtx.createImageData(1,spec.height);
+  const lut=buildLUT($('selColor').value,256);
+  const col=spec.cols[ (spec.x+spec.width-1) % spec.width ];
+  for(let y=0;y<spec.height;y++){
+    let v=col[y];
+    if(sm>0){ // temporal smoothing already applied in col
+      v=clamp(v,0,1);
+    }
+    const idx=(v*255)|0;
+    img.data[y*4]=lut[idx*3];
+    img.data[y*4+1]=lut[idx*3+1];
+    img.data[y*4+2]=lut[idx*3+2];
+    img.data[y*4+3]=255;
+  }
+  specCtx.putImageData(img, (spec.x+spec.width-1)%spec.width, 0);
+}
+
+function drawSpectrogram(){
+  if(!spec.ready) return;
+  const lut=buildLUT($('selColor').value,256);
+  const img=specCtx.createImageData(spec.width,spec.height);
+  for(let x=0;x<spec.width;x++){
+    const col=spec.cols[x];
+    for(let y=0;y<spec.height;y++){
+      const v=col[y];
+      const idx=(clamp(v,0,1)*255)|0;
+      const o=(y*spec.width+x)*4;
+      img.data[o]=lut[idx*3];
+      img.data[o+1]=lut[idx*3+1];
+      img.data[o+2]=lut[idx*3+2];
+      img.data[o+3]=255;
+    }
+  }
+  specCtx.putImageData(img,0,0);
+  // draw frequency axis labels
+  drawSpecAxis();
+}
+
+function drawSpecAxis(){
+  const w=specCv.width, h=specCv.height;
+  specCtx.font=(10*DPR)+'px '+getComputedStyle(document.body).fontFamily;
+  specCtx.fillStyle='rgba(139,152,169,0.75)';
+  const sr=eng.ctx?eng.ctx.sampleRate:44100;
+  const bins=eng.fftSize>>1;
+  const marks=[1000,2000,4000,8000,12000,16000];
+  specCtx.textAlign='left';
+  for(const f of marks){
+    if(f>=sr/2) continue;
+    const bin=f*r/bins; const y=h-(bin/r)*(h-1) - 3;
+    specCtx.fillText((f>=1000?(f/1000)+'k':f)+'Hz', 4*DPR, y);
+  }
+  specCtx.textAlign='left';
+}
+
+/* ---------------- Waveform ---------------- */
+function drawWaveform(){
+  const w=waveCv.width, h=waveCv.height;
+  waveCtx.clearRect(0,0,w,h);
+  waveCtx.strokeStyle='rgba(94,234,212,0.9)';
+  waveCtx.lineWidth=1.5*DPR;
+  waveCtx.beginPath();
+  const td=eng.timeData, n=td.length;
+  for(let i=0;i<w;i++){
+    const idx=(i/w)*(n-1)|0;
+    const y=h/2 - td[idx]*(h/2-6*DPR);
+    if(i===0)waveCtx.moveTo(i,y); else waveCtx.lineTo(i,y);
+  }
+  waveCtx.stroke();
+  // center line
+  waveCtx.strokeStyle='rgba(139,152,169,0.25)';
+  waveCtx.lineWidth=DPR;
+  waveCtx.beginPath(); waveCtx.moveTo(0,h/2); waveCtx.lineTo(w,h/2); waveCtx.stroke();
+}
+
+/* ---------------- Frequency bars ---------------- */
+function drawFreq(){
+  const w=freqCv.width, h=freqCv.height;
+  const lut=buildLUT($('selColor').value,256);
+  freqCtx.clearRect(0,0,w,h);
+  const bins=eng.fftSize>>1;
+  const nBars=Math.min(w/2, 220)|0;
+  const g=eng.gain;
+  const minDb=-90;
+  for(let i=0;i<nBars;i++){
+    const bin=Math.pow(i/(nBars-1),1.4)*(bins-1)|0;
+    const m=Math.hypot(eng.re[bin],eng.im[bin]);
+    const db=20*Math.log10(m+1e-12)+g;
+    const norm=clamp((db-minDb)/(-minDb),0,1);
+    const bw=Math.max(1, w/nBars*0.8);
+    const x=i*(w/nBars);
+    const bh=norm*(h-8*DPR);
+    const idx=(norm*255)|0;
+    freqCtx.fillStyle='rgb('+lut[idx*3]+','+lut[idx*3+1]+','+lut[idx*3+2]+')';
+    freqCtx.fillRect(x, h-bh, bw, bh);
+  }
+}
+
+/* ---------------- Analysis loop ---------------- */
+function analyzeFrame(){
+  if(!eng.analyser) return;
+  // pull time-domain and compute FFT ourselves
+  eng.analyser.getFloatTimeDomainData(eng.timeData);
+  // apply window + copy to re/im
+  for(let i=0;i<eng.fftSize;i++){
+    eng.re[i]=eng.timeData[i]*eng.window[i];
+    eng.im[i]=0;
+  }
+  fftFn(eng.re, eng.im);
+  computeMetrics();
+}
+
+let rafId=null;
+function loop(){
+  if(eng.analyser && (eng.playing||eng.micOn)){
+    analyzeFrame();
+    pushSpectrogramColumn();
+    drawSpectrogramColumn();
+    drawWaveform();
+    drawFreq();
+    renderMeters();
+    updatePlayCursor();
+  }
+  rafId=requestAnimationFrame(loop);
+}
+
+/* ---------------- Full-file analysis (offline) ---------------- */
+function renderFullSpectrogram(){
+  if(!eng.buffer) return;
+  fullMode=true;
+  $('statusText').textContent='分析中 Analyzing…';
+  $('statusPill').classList.add('on');
+  const sr=eng.buffer.sampleRate;
+  const mono=downmix(eng.buffer);
+  const n=mono.length;
+  const fftSize=eng.fftSize, hop=fftSize>>1;
+  const bins=fftSize>>1;
+  const cols=spec.width;
+  const totalFrames=Math.max(1, Math.floor((n-fftSize)/hop));
+  const step=Math.max(1, Math.floor(totalFrames/cols));
+  const bar=$('loadBar').firstElementChild;
+  const localFft=createFFT(fftSize);
+  const win=eng.window;
+  const re=new F32(fftSize), im=new F32(fftSize);
+  const rms=[]; let peakG=0;
+  const minDb=-90, g=eng.gain;
+  const lut=buildLUT($('selColor').value,256);
+  const img=specCtx.createImageData(spec.width,spec.height);
+  let frame=0;
+  for(let x=0;x<cols;x++){
+    const fi=x*step;
+    const start=fi*hop;
+    if(start+fftSize>=n) break;
+    let sum=0;
+    for(let i=0;i<fftSize;i++){
+      const s=mono[start+i]; re[i]=s*win[i]; im[i]=0; sum+=s*s;
+    }
+    localFft(re,im);
+    const r=Math.sqrt(sum/fftSize); rms.push(r);
+    if(r>peakG)peakG=r;
+    for(let y=0;y<spec.height;y++){
+      const bin=(1 - y/(spec.height-1))*(bins-1)|0;
+      const m=Math.hypot(re[bin],im[bin]);
+      const db=20*Math.log10(m+1e-12)+g;
+      const norm=clamp((db-minDb)/(-minDb),0,1);
+      const idx=(norm*255)|0;
+      const o=(y*spec.width+x)*4;
+      img.data[o]=lut[idx*3]; img.data[o+1]=lut[idx*3+1]; img.data[o+2]=lut[idx*3+2]; img.data[o+3]=255;
+    }
+    frame++;
+    bar.style.width=(x/cols*100)+'%';
+  }
+  specCtx.putImageData(img,0,0);
+  drawSpecAxis();
+  bar.style.width='0%';
+  $('loadBar').style.display='none';
+  // compute RMS stats
+  const rmsSum=rms.reduce((a,b)=>a+b,0);
+  const avgRms=rms.length? rmsSum/rms.length:0;
+  const rmsDB=avgRms>1e-9?20*Math.log10(avgRms):-Infinity;
+  const peakDB=peakG>1e-9?20*Math.log10(peakG):-Infinity;
+  eng.meta.rms=rmsDB; eng.meta.peak=peakDB;
+  eng.meta.crest=isFinite(rmsDB)?20*Math.log10(peakG/avgRms):0;
+  renderMeters();
+  $('specCap').textContent=fullInfo();
+  $('statusText').textContent='完成 · '+formatDur(eng.duration);
+  toast('全文件频谱生成完成','✔ 已生成 '+spec.width+'×'+spec.height+' 频谱图');
+}
+function downmix(buf){
+  const ch=buf.numberOfChannels, len=Math.floor(buf.length);
+  const out=new F32(len);
+  const data=[];
+  for(let c=0;c<ch;c++) data.push(buf.getChannelData(c));
+  for(let i=0;i<len;i++){
+    let s=0; for(let c=0;c<ch;c++) s+=data[c][i];
+    out[i]=ch? s/ch:0;
+  }
+  return out;
+}
+
+/* ---------------- Playback ---------------- */
+function startPlayback(){
+  if(!eng.buffer) return;
+  ensureCtx();
+  if(eng.bufferNode) stopPlaybackSources();
+  const src=eng.ctx.createBufferSource();
+  src.buffer=eng.buffer;
+  const gain=eng.ctx.createGain(); gain.gain.value=dbToFull(eng.gain);
+  src.connect(gain); gain.connect(eng.analyser);
+  eng.ctx.destination && eng.analyser.connect(eng.ctx.destination);
+  src.start(0, eng.offset);
+  eng.bufferNode=src; eng.playing=true; eng.startTime=eng.ctx.currentTime;
+  src.onended=()=>{ if(eng.playing){ eng.playing=false; setPlayBtns(false); eng.offset=0; } };
+  setPlayBtns(true);
+  $('statusText').textContent='播放中 · '+eng.fileName;
+  $('statusPill').classList.add('on');
+}
+function stopPlaybackSources(){
+  if(eng.bufferNode){ try{eng.bufferNode.stop();}catch(e){} eng.bufferNode.disconnect(); eng.bufferNode=null; }
+}
+function togglePlay(){
+  if(!eng.buffer) return;
+  if(eng.playing){ pausePlayback(); } else { if(fullMode) fullMode=false; startPlayback(); }
+}
+function pausePlayback(){
+  if(eng.bufferNode){
+    eng.offset=eng.ctx.currentTime-eng.startTime;
+    stopPlaybackSources();
+  }
+  eng.playing=false; setPlayBtns(false);
+  $('statusText').textContent='已暂停 · '+eng.fileName;
+}
+function setPlayBtns(on){
+  $('btnPlay').querySelector && null;
+  $('btnPlay').textContent=on?'▶ 继续':'▶ 播放';
+  $('btnPause').disabled=!on;
+  $('btnPlay').disabled=false;
+}
+function updatePlayCursor(){
+  if(!eng.playing||!eng.bufferNode) return;
+  const t=((eng.ctx.currentTime-eng.startTime)+eng.offset);
+  const pct=clamp(t/eng.duration,0,1);
+  $('metaInfo').textContent=(pct*100|0)+'% · '+formatDur(t)+' / '+formatDur(eng.duration);
+}
+
+/* ---------------- Loading audio ---------------- */
+async function loadFile(file){
+  if(!file) return;
+  ensureCtx();
+  setBusy(true);
+  try{
+    const ab=await file.arrayBuffer();
+    const buf=await eng.ctx.decodeAudioData(ab);
+    eng.buffer=buf; eng.duration=buf.duration; eng.fileName=file.name;
+    eng.playbackRate=1;
+    stopMic();
+    setupAnalyser();
+    eng.offset=0;
+    $('overlay').classList.add('hide');
+    $('btnPlay').disabled=false; $('btnExport').disabled=false;
+    $('metaInfo').textContent=file.name+' · '+formatDur(eng.duration)+' · '+buf.sampleRate+'Hz · '+buf.numberOfChannels+'ch';
+    $('statusText').textContent='已载入 · '+file.name;
+    $('statusPill').classList.add('on');
+    // auto full analysis
+    setTimeout(()=>renderFullSpectrogram(),60);
+    toast('音频载入成功','✔ '+file.name);
+  }catch(e){
+    toast('无法解码该音频文件','✖ '+e.message, true);
+    setBusy(false);
+  }
+}
+function setupAnalyser(){
+  if(!eng.ctx) return;
+  if(eng.analyser) eng.analyser.disconnect();
+  eng.analyser=eng.ctx.createAnalyser();
+  eng.analyser.fftSize=eng.fftSize;
+  eng.analyser.smoothingTimeConstant=0.75;
+  rebuildFFT();
+}
+function setBusy(b){
+  const bar=$('loadBar'); bar.style.display=b?'block':'none';
+}
+function formatDur(t){
+  if(!isFinite(t))return '0:00';
+  t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t%60);
+  return m+':'+(s<10?'0':'')+s;
+}
+function fullInfo(){
+  return eng.buffer? (eng.buffer.sampleRate/1000).toFixed(1)+'kHz · FFT '+eng.fftSize : '—';
+}
+function updateCaps(){
+  $('specCap').textContent=fullInfo();
+  $('freqCap').textContent=eng.ctx?(eng.ctx.sampleRate/1000).toFixed(1)+'kHz / FFT '+eng.fftSize:'—';
+  $('waveCap').textContent=eng.ctx?(eng.ctx.sampleRate/1000).toFixed(1)+'kHz':'—';
+}
+
+/* ---------------- Microphone ---------------- */
+async function toggleMic(){
+  if(eng.micOn){ stopMic(); return; }
+  try{
+    ensureCtx();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    eng.mediaStream=stream;
+    setupAnalyser();
+    const src=eng.ctx.createMediaStreamSource(stream);
+    src.connect(eng.analyser);
+    eng.source=src;
+    eng.micOn=true; fullMode=false;
+    eng.buffer=null; eng.duration=0;
+    $('statusPill').classList.add('rec');
+    $('statusText').textContent='麦克风实时分析中';
+    $('btnMic').textContent='⏹ 停止麦';
+    $('btnPlay').disabled=true; $('btnExport').disabled=true;
+    $('overlay').classList.add('hide');
+    $('metaInfo').textContent='MIC · '+eng.ctx.sampleRate+'Hz';
+    eng.playing=true; // keep loop running
+    toast('麦克风已开启','🎤 实时频谱分析进行中');
+  }catch(e){
+    toast('无法访问麦克风','✖ '+e.message,true);
+  }
+}
+function stopMic(){
+  if(eng.mediaStream){ eng.mediaStream.getTracks().forEach(t=>t.stop()); eng.mediaStream=null; }
+  if(eng.source){ try{eng.source.disconnect();}catch(e){} eng.source=null; }
+  eng.micOn=false; eng.playing=false;
+  $('statusPill').classList.remove('rec');
+  $('btnMic').textContent='🎤 麦克风';
+  $('statusText').textContent = eng.buffer?('已载入 · '+eng.fileName):'闲置 Idle';
+}
+
+/* ---------------- Export PNG ---------------- */
+function exportPNG(){
+  if(!spec.ready) return;
+  const cv=document.createElement('canvas');
+  cv.width=spec.width; cv.height=spec.height;
+  const ctx=cv.getContext('2d');
+  ctx.drawImage(specCv,0,0);
+  const a=document.createElement('a');
+  a.download=(eng.fileName? eng.fileName.replace(/\.[^.]+$/,'') :'wavelens')+'-spectrogram.png';
+  a.href=cv.toDataURL('image/png');
+  a.click();
+  toast('频谱图已导出','✔ PNG 已下载');
+}
+
+/* ---------------- Toast ---------------- */
+let toastTimer=null;
+function toast(msg, ico, isErr){
+  $('toastMsg').textContent=msg;
+  $('toast').className=isErr?'error':'';
+  $('toast').querySelector('.t-ico').textContent=ico||'✓';
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600);
+}
+
+/* ---------------- Events ---------------- */
+function onParamChange(){
+  eng.gain=parseFloat($('rngGain').value);
+  eng.smoothing=parseFloat($('rngSmooth').value)/100;
+  rebuildFFT();
+  updateCaps();
+  if(fullMode && eng.buffer) renderFullSpectrogram();
+}
+function onFftChange(){
+  rebuildFFT();
+  updateCaps();
+  if(fullMode && eng.buffer) renderFullSpectrogram();
+}
+function onColorChange(){
+  if(fullMode && eng.buffer){ redrawFullFromBuffer(); }
+  else if(spec.ready){ drawSpectrogram(); }
+}
+function redrawFullFromBuffer(){
+  // re-render using stored buffer (recompute) — simplest: re-run render
+  if(eng.buffer) renderFullSpectrogram();
+}
+
+$('btnFile').addEventListener('click',()=>$('fileInput').click());
+$('fileInput').addEventListener('change',e=>loadFile(e.target.files[0]));
+$('btnMic').addEventListener('click',toggleMic);
+$('btnPlay').addEventListener('click',togglePlay);
+$('btnPause').addEventListener('click',pausePlayback);
+$('btnExport').addEventListener('click',exportPNG);
+$('selFft').addEventListener('change',onFftChange);
+$('selWindow').addEventListener('change',onFftChange);
+$('selColor').addEventListener('change',onColorChange);
+$('rngSmooth').addEventListener('input',onParamChange);
+$('rngGain').addEventListener('input',onParamChange);
+document.querySelectorAll('#segMode button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#segMode button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    fullMode = b.dataset.mode==='full';
+    $('btnExport').disabled = !eng.buffer;
+    if(fullMode && eng.buffer) renderFullSpectrogram();
+    else if(spec.ready && eng.buffer) drawSpectrogram();
+  });
+});
+// drag & drop
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();}));
+document.addEventListener('drop',e=>{
+  e.preventDefault();
+  const f=e.dataTransfer.files[0];
+  if(f){ loadFile(f); }
+});
+// keyboard
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); togglePlay(); }
+});
+
+/* ---------------- Init ---------------- */
+window.addEventListener('load',()=>{
+  ensureCtx();
+  eng.fftSize=2048;
+  eng.window=makeWindow('hann',2048);
+  eng.windowName='hann';
+  fftFn=createFFT(2048);
+  eng.timeData=new F32(2048);
+  eng.re=new F32(2048); eng.im=new F32(2048);
+  resizeAll();
+  updateCaps();
+  setPlayBtns(false);
+  $('btnPause').disabled=true; $('btnPlay').disabled=true; $('btnExport').disabled=true;
+  loop();
+});
+</script>
+</body>
+</html>

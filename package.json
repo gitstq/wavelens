@@ -1,0 +1,38 @@
+{
+  "name": "wavelens",
+  "version": "1.0.0",
+  "description": "WaveLens — Local-first, offline, zero-dependency browser audio spectrogram & sound analysis lab. 零依赖、离线、本地优先的浏览器音频频谱分析实验室。",
+  "keywords": [
+    "audio",
+    "spectrogram",
+    "fft",
+    "dsp",
+    "spectrum-analyzer",
+    "web-audio",
+    "visualizer",
+    "offline-first",
+    "zero-dependency",
+    "data-visualization"
+  ],
+  "license": "MIT",
+  "author": "WaveLens",
+  "type": "module",
+  "main": "index.html",
+  "files": [
+    "index.html",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "npx --yes serve . -l 8080",
+    "dev": "npx --yes serve . -l 8080",
+    "open": "open index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/wavelens"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
